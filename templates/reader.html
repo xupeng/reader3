@@ -36,9 +36,56 @@
         .nav-btn:hover { background: #3498db; color: white; }
         .nav-btn.disabled { opacity: 0.5; pointer-events: none; border-color: #ccc; color: #ccc; }
 
+        /* 侧边栏隐藏样式 */
+        body.noindex {
+            display: block; /* 改为块布局 */
+        }
+
+        body.noindex #sidebar {
+            display: none; /* 隐藏侧边栏 */
+        }
+
+        body.noindex #main {
+            width: 100%; /* 全屏宽度 */
+        }
+
+        /* 切换按钮样式 */
+        .toggle-sidebar {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: -apple-system, sans-serif;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .toggle-sidebar:hover {
+            background: #2980b9;
+        }
+
+        body.noindex .toggle-sidebar {
+            background: #e74c3c;
+        }
+
+        body.noindex .toggle-sidebar:hover {
+            background: #c0392b;
+        }
+
     </style>
 </head>
-<body>
+<body class="{% if noindex %}noindex{% endif %}">
+
+    <!-- 切换按钮 -->
+    <button class="toggle-sidebar" onclick="toggleSidebar()">
+        {% if noindex %}显示目录{% else %}隐藏目录{% endif %}
+    </button>
 
     <!-- SIDEBAR -->
     <div id="sidebar">
@@ -103,7 +150,7 @@
 
             <div class="chapter-nav">
                 {% if prev_idx is not none %}
-                    <a href="/read/{{ book_id }}/{{ prev_idx }}" class="nav-btn">← Previous</a>
+                    <a href="/read/{{ book_id }}/{{ prev_idx }}{% if noindex %}?noindex=true{% endif %}" class="nav-btn">← Previous</a>
                 {% else %}
                     <span class="nav-btn disabled">← Previous</span>
                 {% endif %}
@@ -113,7 +160,7 @@
                 </span>
 
                 {% if next_idx is not none %}
-                    <a href="/read/{{ book_id }}/{{ next_idx }}" class="nav-btn">Next →</a>
+                    <a href="/read/{{ book_id }}/{{ next_idx }}{% if noindex %}?noindex=true{% endif %}" class="nav-btn">Next →</a>
                 {% else %}
                     <span class="nav-btn disabled">Next →</span>
                 {% endif %}
@@ -140,7 +187,15 @@
             const idx = spineMap[cleanFile];
 
             if (idx !== undefined) {
+                // 获取当前URL参数
+                const urlParams = new URLSearchParams(window.location.search);
                 let url = "/read/{{ book_id }}/" + idx;
+
+                // 如果有noindex参数，保持它
+                if (urlParams.get('noindex') === 'true') {
+                    url += '?noindex=true';
+                }
+
                 // If there was an anchor, we could try to scroll to it,
                 // but simple page loads often lose anchor position without extra JS.
                 // Let's just go to the page.
@@ -149,6 +204,42 @@
                 console.log("Could not find index for", filename);
             }
         }
+
+        // 切换侧边栏功能
+        function toggleSidebar() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const currentState = urlParams.get('noindex') === 'true';
+
+            // 创建新的URL参数
+            const newParams = new URLSearchParams(urlParams);
+
+            if (currentState) {
+                // 当前是隐藏状态，切换到显示
+                newParams.delete('noindex');
+            } else {
+                // 当前是显示状态，切换到隐藏
+                newParams.set('noindex', 'true');
+            }
+
+            // 构建新的URL
+            const newUrl = window.location.pathname +
+                           (newParams.toString() ? '?' + newParams.toString() : '') +
+                           window.location.hash;
+
+            // 导航到新URL
+            window.location.href = newUrl;
+        }
+
+        // 页面加载时更新按钮文本
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const isNoIndex = urlParams.get('noindex') === 'true';
+            const toggleBtn = document.querySelector('.toggle-sidebar');
+
+            if (toggleBtn) {
+                toggleBtn.textContent = isNoIndex ? '显示目录' : '隐藏目录';
+            }
+        });
     </script>
 </body>
 </html>

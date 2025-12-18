@@ -37,5 +37,22 @@
             {% endfor %}
         </div>
     </div>
+
+    <script>
+        // 为所有书籍链接添加noindex参数支持
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const noindex = urlParams.get('noindex');
+
+            if (noindex === 'true') {
+                // 为所有书籍链接添加noindex参数
+                const bookLinks = document.querySelectorAll('a[href^="/read/"]');
+                bookLinks.forEach(link => {
+                    const href = link.getAttribute('href');
+                    link.setAttribute('href', href + '?noindex=true');
+                });
+            }
+        });
+    </script>
 </body>
 </html>

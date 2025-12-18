@@ -3,7 +3,7 @@ import pickle
 from functools import lru_cache
 from typing import Optional
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -56,12 +56,20 @@ async def library_view(request: Request):
     return templates.TemplateResponse("library.html", {"request": request, "books": books})
 
 @app.get("/read/{book_id}", response_class=HTMLResponse)
-async def redirect_to_first_chapter(book_id: str):
+async def redirect_to_first_chapter(
+    book_id: str,
+    noindex: bool = Query(False)
+):
     """Helper to just go to chapter 0."""
-    return await read_chapter(book_id=book_id, chapter_index=0)
+    return await read_chapter(book_id=book_id, chapter_index=0, noindex=noindex)
 
 @app.get("/read/{book_id}/{chapter_index}", response_class=HTMLResponse)
-async def read_chapter(request: Request, book_id: str, chapter_index: int):
+async def read_chapter(
+    request: Request,
+    book_id: str,
+    chapter_index: int,
+    noindex: bool = Query(False, description="Hide sidebar navigation")
+):
     """The main reader interface."""
     book = load_book_cached(book_id)
     if not book:
@@ -83,7 +91,8 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
         "chapter_index": chapter_index,
         "book_id": book_id,
         "prev_idx": prev_idx,
-        "next_idx": next_idx
+        "next_idx": next_idx,
+        "noindex": noindex
     })
 
 @app.get("/read/{book_id}/images/{image_name}")
