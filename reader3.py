@@ -71,38 +71,57 @@ class Book:
 # --- Utilities ---
 
 def generate_slug(title: str, fallback_filename: str = "") -> str:
-    """从书名生成 URL-safe 的 slug"""
+    """从书名生成 URL-safe 的拼音 slug
+
+    - 中文 -> 拼音（全拼、无声调、连字符分隔）
+    - 英文 -> 保留并小写
+    - 中英混合 -> 智能处理
+    """
     import re
     import unicodedata
+    from pypinyin import lazy_pinyin, Style
+    from pypinyin.constants import RE_HANS
 
     source = title.strip() if title.strip() else fallback_filename
-
     if not source:
         return "untitled-book"
 
-    # Unicode 规范化（移除重音符号等）
-    normalized = unicodedata.normalize('NFD', source)
-    ascii_chars = ''.join(
-        c for c in normalized
-        if unicodedata.category(c) != 'Mn'
-    )
+    # 分段处理中文和非中文字符
+    parts = []
+    current_segment = ""
+    last_was_hans = None
 
-    # 转小写
-    slug = ascii_chars.lower()
+    for char in source:
+        is_hans = bool(RE_HANS.match(char))
+        if last_was_hans is not None and is_hans != last_was_hans:
+            if current_segment:
+                parts.append((last_was_hans, current_segment))
+                current_segment = ""
+        current_segment += char
+        last_was_hans = is_hans
 
-    # 空格和下划线替换为连字符
-    slug = re.sub(r'[\s_]+', '-', slug)
+    if current_segment:
+        parts.append((last_was_hans, current_segment))
 
-    # 移除非字母数字字符（保留连字符和中文字符）
-    slug = re.sub(r'[^\w\u4e00-\u9fff-]', '-', slug)
+    # 转换各段落
+    slug_parts = []
+    for is_hans, segment in parts:
+        if is_hans:
+            # 中文转拼音（词组智能识别）
+            pinyin_list = lazy_pinyin(segment, style=Style.NORMAL)
+            slug_parts.extend(pinyin_list)
+        else:
+            # 英文规范化并分词
+            normalized = unicodedata.normalize('NFD', segment)
+            ascii_chars = ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
+            words = re.split(r'[^a-z0-9]+', ascii_chars.lower())
+            slug_parts.extend([w for w in words if w])
 
-    # 合并多个连字符
+    # 连接并清理
+    slug = '-'.join(slug_parts)
+    slug = re.sub(r'[^a-z0-9-]', '-', slug)
     slug = re.sub(r'-+', '-', slug)
-
-    # 去除首尾连字符
-    slug = slug.strip('-')
-
-    return slug if slug else "untitled-book"
+    return slug.strip('-') or "untitled-book"
 
 
 def clean_html_content(soup: BeautifulSoup) -> BeautifulSoup:
