@@ -151,7 +151,7 @@
 
             <div class="chapter-nav">
                 {% if prev_idx is not none %}
-                    <a href="/read/{{ book_slug }}/{{ prev_idx }}{% if noindex %}?noindex=true{% endif %}" class="nav-btn">← Previous</a>
+                    <a href="/read/{{ book_slug }}/{{ prev_idx }}{% if noindex %}/noindex{% endif %}" class="nav-btn">← Previous</a>
                 {% else %}
                     <span class="nav-btn disabled">← Previous</span>
                 {% endif %}
@@ -161,7 +161,7 @@
                 </span>
 
                 {% if next_idx is not none %}
-                    <a href="/read/{{ book_slug }}/{{ next_idx }}{% if noindex %}?noindex=true{% endif %}" class="nav-btn">Next →</a>
+                    <a href="/read/{{ book_slug }}/{{ next_idx }}{% if noindex %}/noindex{% endif %}" class="nav-btn">Next →</a>
                 {% else %}
                     <span class="nav-btn disabled">Next →</span>
                 {% endif %}
@@ -188,13 +188,14 @@
             const idx = spineMap[cleanFile];
 
             if (idx !== undefined) {
-                // 获取当前URL参数
-                const urlParams = new URLSearchParams(window.location.search);
+                // 检查当前 URL 是否以 /noindex 结尾
+                const currentPath = window.location.pathname;
+                const isNoIndex = currentPath.endsWith('/noindex');
                 let url = "/read/{{ book_slug }}/" + idx;
 
-                // 如果有noindex参数，保持它
-                if (urlParams.get('noindex') === 'true') {
-                    url += '?noindex=true';
+                // 如果当前是 noindex 模式，保持它
+                if (isNoIndex) {
+                    url += '/noindex';
                 }
 
                 // If there was an anchor, we could try to scroll to it,
@@ -208,33 +209,22 @@
 
         // 切换侧边栏功能
         function toggleSidebar() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const currentState = urlParams.get('noindex') === 'true';
+            const currentPath = window.location.pathname;
+            const isNoIndex = currentPath.endsWith('/noindex');
 
-            // 创建新的URL参数
-            const newParams = new URLSearchParams(urlParams);
-
-            if (currentState) {
-                // 当前是隐藏状态，切换到显示
-                newParams.delete('noindex');
-            } else {
-                // 当前是显示状态，切换到隐藏
-                newParams.set('noindex', 'true');
-            }
-
-            // 构建新的URL
-            const newUrl = window.location.pathname +
-                           (newParams.toString() ? '?' + newParams.toString() : '') +
-                           window.location.hash;
+            // 添加或移除 /noindex 路径段
+            const newPath = isNoIndex
+                ? currentPath.replace('/noindex', '')
+                : currentPath + '/noindex';
 
             // 导航到新URL
-            window.location.href = newUrl;
+            window.location.href = newPath + window.location.search + window.location.hash;
         }
 
         // 页面加载时更新按钮文本
         document.addEventListener('DOMContentLoaded', function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const isNoIndex = urlParams.get('noindex') === 'true';
+            const currentPath = window.location.pathname;
+            const isNoIndex = currentPath.endsWith('/noindex');
             const toggleBtn = document.querySelector('.toggle-sidebar');
 
             if (toggleBtn) {

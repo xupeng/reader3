@@ -93,6 +93,21 @@ async def redirect_to_first_chapter(
         chapter_index=0, noindex=noindex
     )
 
+@app.get("/read/{book_slug}/noindex", response_class=HTMLResponse)
+async def redirect_to_first_chapter_noindex(
+    request: Request,
+    book_slug: str
+):
+    """Helper to just go to chapter 0 (hidden sidebar)."""
+    result = find_book_by_slug(book_slug)
+    if not result:
+        raise HTTPException(status_code=404, detail="Book not found")
+    folder_name, book = result
+    return await read_chapter(
+        request=request, book_slug=book_slug, folder_name=folder_name,
+        chapter_index=0, noindex=True
+    )
+
 @app.get("/read/{book_slug}/{chapter_index}", response_class=HTMLResponse)
 async def read_chapter(
     request: Request,
@@ -132,6 +147,22 @@ async def read_chapter(
         "next_idx": next_idx,
         "noindex": noindex
     })
+
+@app.get("/read/{book_slug}/{chapter_index}/noindex", response_class=HTMLResponse)
+async def read_chapter_noindex(
+    request: Request,
+    book_slug: str,
+    chapter_index: int,
+    folder_name: str = None
+):
+    """阅读界面 - 隐藏侧边栏版本"""
+    return await read_chapter(
+        request=request,
+        book_slug=book_slug,
+        chapter_index=chapter_index,
+        noindex=True,
+        folder_name=folder_name
+    )
 
 @app.get("/read/{book_slug}/images/{image_name}")
 async def serve_image(book_slug: str, image_name: str):
