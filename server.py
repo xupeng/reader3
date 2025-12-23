@@ -16,6 +16,24 @@ templates = Jinja2Templates(directory="templates")
 # Where are the book folders located?
 BOOKS_DIR = "."
 
+
+def generate_slug_from_id(folder_name: str) -> str:
+    """为旧书籍（无 slug 字段）生成 slug"""
+    name = folder_name.replace("_data", "")
+    return name.lower().replace(" ", "-").replace("_", "-")
+
+
+def find_book_by_slug(slug: str) -> Optional[tuple[str, Book]]:
+    """通过 slug 查找书籍，返回 (folder_name, book) 或 None"""
+    if os.path.exists(BOOKS_DIR):
+        for item in os.listdir(BOOKS_DIR):
+            if item.endswith("_data") and os.path.isdir(os.path.join(BOOKS_DIR, item)):
+                book = load_book_cached(item)
+                if book and book.slug == slug:
+                    return (item, book)
+    return None
+
+
 @lru_cache(maxsize=10)
 def load_book_cached(folder_name: str) -> Optional[Book]:
     """
@@ -29,6 +47,11 @@ def load_book_cached(folder_name: str) -> Optional[Book]:
     try:
         with open(file_path, "rb") as f:
             book = pickle.load(f)
+
+        # 兼容旧书籍：如果没有 slug，动态生成
+        if not book.slug:
+            book.slug = generate_slug_from_id(folder_name)
+
         return book
     except Exception as e:
         print(f"Error loading book {folder_name}: {e}")
@@ -42,12 +65,12 @@ async def library_view(request: Request):
     # Scan directory for folders ending in '_data' that have a book.pkl
     if os.path.exists(BOOKS_DIR):
         for item in os.listdir(BOOKS_DIR):
-            if item.endswith("_data") and os.path.isdir(item):
+            if item.endswith("_data") and os.path.isdir(os.path.join(BOOKS_DIR, item)):
                 # Try to load it to get the title
                 book = load_book_cached(item)
                 if book:
                     books.append({
-                        "id": item,
+                        "slug": book.slug,
                         "title": book.metadata.title,
                         "author": ", ".join(book.metadata.authors),
                         "chapters": len(book.spine)
@@ -55,23 +78,38 @@ async def library_view(request: Request):
 
     return templates.TemplateResponse("library.html", {"request": request, "books": books})
 
-@app.get("/read/{book_id}", response_class=HTMLResponse)
+@app.get("/read/{book_slug}", response_class=HTMLResponse)
 async def redirect_to_first_chapter(
-    book_id: str,
+    book_slug: str,
     noindex: bool = Query(False)
 ):
     """Helper to just go to chapter 0."""
-    return await read_chapter(book_id=book_id, chapter_index=0, noindex=noindex)
+    result = find_book_by_slug(book_slug)
+    if not result:
+        raise HTTPException(status_code=404, detail="Book not found")
+    folder_name, book = result
+    return await read_chapter(
+        request=None, book_slug=book_slug, folder_name=folder_name,
+        chapter_index=0, noindex=noindex
+    )
 
-@app.get("/read/{book_id}/{chapter_index}", response_class=HTMLResponse)
+@app.get("/read/{book_slug}/{chapter_index}", response_class=HTMLResponse)
 async def read_chapter(
     request: Request,
-    book_id: str,
+    book_slug: str,
     chapter_index: int,
-    noindex: bool = Query(False, description="Hide sidebar navigation")
+    noindex: bool = Query(False, description="Hide sidebar navigation"),
+    folder_name: str = None
 ):
     """The main reader interface."""
-    book = load_book_cached(book_id)
+    if folder_name is None:
+        result = find_book_by_slug(book_slug)
+        if not result:
+            raise HTTPException(status_code=404, detail="Book not found")
+        folder_name, book = result
+    else:
+        book = load_book_cached(folder_name)
+
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
 
@@ -89,24 +127,26 @@ async def read_chapter(
         "book": book,
         "current_chapter": current_chapter,
         "chapter_index": chapter_index,
-        "book_id": book_id,
+        "book_slug": book_slug,
         "prev_idx": prev_idx,
         "next_idx": next_idx,
         "noindex": noindex
     })
 
-@app.get("/read/{book_id}/images/{image_name}")
-async def serve_image(book_id: str, image_name: str):
+@app.get("/read/{book_slug}/images/{image_name}")
+async def serve_image(book_slug: str, image_name: str):
     """
     Serves images specifically for a book.
     The HTML contains <img src="images/pic.jpg">.
-    The browser resolves this to /read/{book_id}/images/pic.jpg.
+    The browser resolves this to /read/{book_slug}/images/pic.jpg.
     """
-    # Security check: ensure book_id is clean
-    safe_book_id = os.path.basename(book_id)
-    safe_image_name = os.path.basename(image_name)
+    result = find_book_by_slug(book_slug)
+    if not result:
+        raise HTTPException(status_code=404, detail="Book not found")
+    folder_name, _ = result
 
-    img_path = os.path.join(BOOKS_DIR, safe_book_id, "images", safe_image_name)
+    safe_image_name = os.path.basename(image_name)
+    img_path = os.path.join(BOOKS_DIR, folder_name, "images", safe_image_name)
 
     if not os.path.exists(img_path):
         raise HTTPException(status_code=404, detail="Image not found")

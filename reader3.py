@@ -65,9 +65,45 @@ class Book:
     source_file: str
     processed_at: str
     version: str = "3.0"
+    slug: str = ""  # URL-safe identifier
 
 
 # --- Utilities ---
+
+def generate_slug(title: str, fallback_filename: str = "") -> str:
+    """从书名生成 URL-safe 的 slug"""
+    import re
+    import unicodedata
+
+    source = title.strip() if title.strip() else fallback_filename
+
+    if not source:
+        return "untitled-book"
+
+    # Unicode 规范化（移除重音符号等）
+    normalized = unicodedata.normalize('NFD', source)
+    ascii_chars = ''.join(
+        c for c in normalized
+        if unicodedata.category(c) != 'Mn'
+    )
+
+    # 转小写
+    slug = ascii_chars.lower()
+
+    # 空格和下划线替换为连字符
+    slug = re.sub(r'[\s_]+', '-', slug)
+
+    # 移除非字母数字字符（保留连字符和中文字符）
+    slug = re.sub(r'[^\w\u4e00-\u9fff-]', '-', slug)
+
+    # 合并多个连字符
+    slug = re.sub(r'-+', '-', slug)
+
+    # 去除首尾连字符
+    slug = slug.strip('-')
+
+    return slug if slug else "untitled-book"
+
 
 def clean_html_content(soup: BeautifulSoup) -> BeautifulSoup:
 
@@ -301,12 +337,32 @@ if __name__ == "__main__":
 
     epub_file = sys.argv[1]
     assert os.path.exists(epub_file), "File not found."
-    out_dir = os.path.splitext(epub_file)[0] + "_data"
+
+    # 预加载元数据以获取书名
+    temp_book = epub.read_epub(epub_file)
+    temp_metadata = extract_metadata_robust(temp_book)
+    fallback_name = os.path.splitext(os.path.basename(epub_file))[0]
+
+    # 生成 slug
+    slug = generate_slug(temp_metadata.title, fallback_name)
+
+    # 检查文件夹冲突并处理
+    base_out_dir = slug + "_data"
+    out_dir = base_out_dir
+    counter = 1
+    while os.path.exists(out_dir):
+        out_dir = f"{slug}_{counter}_data"
+        counter += 1
 
     book_obj = process_epub(epub_file, out_dir)
+
+    # 保存 slug 到 Book 对象
+    book_obj.slug = slug
+
     save_to_pickle(book_obj, out_dir)
     print("\n--- Summary ---")
     print(f"Title: {book_obj.metadata.title}")
+    print(f"Slug: {book_obj.slug}")
     print(f"Authors: {', '.join(book_obj.metadata.authors)}")
     print(f"Physical Files (Spine): {len(book_obj.spine)}")
     print(f"TOC Root Items: {len(book_obj.toc)}")

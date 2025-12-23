@@ -151,7 +151,7 @@
 
             <div class="chapter-nav">
                 {% if prev_idx is not none %}
-                    <a href="/read/{{ book_id }}/{{ prev_idx }}{% if noindex %}?noindex=true{% endif %}" class="nav-btn">← Previous</a>
+                    <a href="/read/{{ book_slug }}/{{ prev_idx }}{% if noindex %}?noindex=true{% endif %}" class="nav-btn">← Previous</a>
                 {% else %}
                     <span class="nav-btn disabled">← Previous</span>
                 {% endif %}
@@ -161,7 +161,7 @@
                 </span>
 
                 {% if next_idx is not none %}
-                    <a href="/read/{{ book_id }}/{{ next_idx }}{% if noindex %}?noindex=true{% endif %}" class="nav-btn">Next →</a>
+                    <a href="/read/{{ book_slug }}/{{ next_idx }}{% if noindex %}?noindex=true{% endif %}" class="nav-btn">Next →</a>
                 {% else %}
                     <span class="nav-btn disabled">Next →</span>
                 {% endif %}
@@ -190,7 +190,7 @@
             if (idx !== undefined) {
                 // 获取当前URL参数
                 const urlParams = new URLSearchParams(window.location.search);
-                let url = "/read/{{ book_id }}/" + idx;
+                let url = "/read/{{ book_slug }}/" + idx;
 
                 // 如果有noindex参数，保持它
                 if (urlParams.get('noindex') === 'true') {
