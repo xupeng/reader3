@@ -50,12 +50,18 @@
             width: 100%; /* 全屏宽度 */
         }
 
-        /* 切换按钮样式 */
-        .toggle-sidebar {
+        /* 按钮容器 */
+        .top-buttons {
             position: fixed;
             top: 20px;
             right: 20px;
             z-index: 1000;
+            display: flex;
+            gap: 10px;
+        }
+
+        /* 切换按钮样式 */
+        .toggle-sidebar {
             background: #3498db;
             color: white;
             border: none;
@@ -79,14 +85,40 @@
             background: #c0392b;
         }
 
+        /* 复制链接按钮样式 */
+        .copy-link {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: -apple-system, sans-serif;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .copy-link:hover {
+            background: #27ae60;
+        }
+
+        .copy-link.copied {
+            background: #27ae60;
+        }
+
     </style>
 </head>
 <body class="{% if noindex %}noindex{% endif %}">
 
-    <!-- 切换按钮 -->
-    <button class="toggle-sidebar" onclick="toggleSidebar()">
-        {% if noindex %}显示目录{% else %}隐藏目录{% endif %}
-    </button>
+    <!-- 右上角按钮组 -->
+    <div class="top-buttons">
+        <button class="toggle-sidebar" onclick="toggleSidebar()">
+            {% if noindex %}显示目录{% else %}隐藏目录{% endif %}
+        </button>
+        <button class="copy-link" onclick="copyLink()" title="复制无目录链接">
+            复制链接
+        </button>
+    </div>
 
     <!-- SIDEBAR -->
     <div id="sidebar">
@@ -231,6 +263,43 @@
                 toggleBtn.textContent = isNoIndex ? '显示目录' : '隐藏目录';
             }
         });
+
+        // 复制链接功能
+        function copyLink() {
+            // 构建无目录URL
+            let url = window.location.origin + window.location.pathname;
+
+            // 如果URL不包含 /noindex，则添加
+            if (!url.endsWith('/noindex')) {
+                url = url + '/noindex';
+            }
+
+            // 添加查询参数和hash
+            url = url + window.location.search + window.location.hash;
+
+            // 复制到剪贴板
+            navigator.clipboard.writeText(url).then(() => {
+                // 显示复制成功反馈
+                const copyBtn = document.querySelector('.copy-link');
+                copyBtn.textContent = '已复制!';
+                copyBtn.classList.add('copied');
+
+                // 2秒后恢复按钮状态
+                setTimeout(() => {
+                    copyBtn.textContent = '复制链接';
+                    copyBtn.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('复制失败:', err);
+                // 降级方案：使用传统方法
+                const textArea = document.createElement('textarea');
+                textArea.value = url;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            });
+        }
     </script>
 </body>
 </html>
